@@ -635,6 +635,18 @@ void WLED::beginStrip()
   }
 
   strip.setTransition(transitionDelayDefault);  // restore transitions
+
+#ifdef WLED_HYPERK_TURBO
+  if (hyperkTurboMode) {
+    arlsForceMaxBri = true;            // HyperHDR pre-applies brightness
+    arlsDisableGammaCorrection = true; // HyperHDR pre-applies gamma
+    useMainSegmentOnly = true;         // segment bypass requires single-segment mental model
+    realtimeRespectLedMaps = false;    // skip ledmap walk
+    receiveDirect = true;              // listen on UDP 21324
+    if (realtimeTimeoutMs < 6500) realtimeTimeoutMs = 6500; // match HyperK 6.5s blackout
+    BusManager::setMilliampsMax(0);    // disable ABL globally; user can re-enable in /settings if desired
+  }
+#endif
 }
 
 void WLED::initAP(bool resetAP)
