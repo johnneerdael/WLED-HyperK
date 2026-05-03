@@ -893,6 +893,15 @@ void WLED::initInterfaces()
     MDNS.addService("http", "tcp", 80);
     MDNS.addService("wled", "tcp", 80);
     MDNS.addServiceTxt("wled", "tcp", "mac", escapedMac.c_str());
+#ifdef WLED_HYPERK_TURBO
+    if (hyperkTurboMode) {
+      MDNS.addService("hyperk", "tcp", 80);
+      MDNS.addServiceTxt("hyperk", "tcp", "mac", escapedMac.c_str());
+      MDNS.addServiceTxt("hyperk", "tcp", "id", escapedMac.c_str());
+      MDNS.addServiceTxt("hyperk", "tcp", "ver", versionString);
+      MDNS.addServiceTxt("hyperk", "tcp", "src", "wled-turbo");
+    }
+#endif
   }
   server.begin();
 
