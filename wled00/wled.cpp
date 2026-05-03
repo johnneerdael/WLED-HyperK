@@ -840,7 +840,7 @@ static void hyperkRtTask(void * /*arg*/) {
     if (hyperkTurboMode) {
       hyperkPumpRealtimeUDP();
     }
-    vTaskDelay(1); // 1 tick (~1 ms) — yields without busy-wait
+    vTaskDelay(1); // 1 tick — yields without busy-wait. Tick granularity is configTICK_RATE_HZ-dependent (default 10 ms on ESP32). G4 hardware bench will reveal whether this is the limiting latency factor; if so, revisit polling strategy.
   }
 }
 
@@ -851,7 +851,11 @@ static void startHyperkRtTask() {
   // (~WLEDPACKETSIZE bytes) plus modest local scratch. Priority 5 keeps it above
   // typical Arduino loop (1) without preempting Wi-Fi (high priorities).
   // Pinned to core 1 (where Arduino loop runs); the WiFi stack runs on core 0.
-  xTaskCreatePinnedToCore(hyperkRtTask, "hyperkRt", 4096, nullptr, 5, &handle, 1);
+  BaseType_t res = xTaskCreatePinnedToCore(hyperkRtTask, "hyperkRt", 4096, nullptr, 5, &handle, 1);
+  if (res != pdPASS) {
+    DEBUG_PRINTLN(F("hyperkRt task creation failed (heap?); turbo realtime will not be served"));
+    handle = nullptr; // ensure we can retry on a future call
+  }
 }
 #endif
 

@@ -453,9 +453,9 @@ WLED_GLOBAL int arlsOffset _INIT(0);                              // realtime LE
 WLED_GLOBAL bool arlsDisableGammaCorrection _INIT(true);          // activate if gamma correction is handled by the source
 WLED_GLOBAL bool arlsForceMaxBri _INIT(false);                    // enable to force max brightness if source has very dark colors that would be black
 #ifdef WLED_HYPERK_TURBO
-WLED_GLOBAL bool hyperkTurboMode _INIT(true);                     // bypass FX pipeline in realtime UDP path
+WLED_GLOBAL volatile bool hyperkTurboMode _INIT(true);            // bypass FX pipeline in realtime UDP path
 #else
-WLED_GLOBAL bool hyperkTurboMode _INIT(false);
+WLED_GLOBAL volatile bool hyperkTurboMode _INIT(false);
 #endif
 
 #ifdef WLED_ENABLE_DMX
