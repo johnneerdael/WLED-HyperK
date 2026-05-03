@@ -1,5 +1,12 @@
 #include "wled.h"
 
+#ifdef BENCH_PROBE
+#include <WiFiUdp.h>
+static WiFiUDP probeUdp;
+static IPAddress probeHost;
+static uint16_t probePort = 21325;
+#endif
+
 /*
  * UDP sync notifier / Realtime / Hyperion / TPM2.NET
  */
@@ -639,7 +646,30 @@ void handleNotifications()
       }
 #ifdef WLED_HYPERK_TURBO
       if (hyperkTurboMode) {
+#ifdef BENCH_PROBE
+        uint32_t recvUs = micros();
+#endif
         BusManager::showNoABL();
+#ifdef BENCH_PROBE
+        // Reply to host with seq from pixel 0 R/G/B + render time.
+        // Pixel 0's RGB encodes the host-side sequence number (3 bytes).
+        // udpIn[0] = protocol type, udpIn[1] = timeout, then per-protocol header offset.
+        uint32_t seqOff;
+        if (udpIn[0] == 4 || udpIn[0] == 5) {       // DNRGB / DNRGBW: bytes 2-3 = start_index, then RGB
+          seqOff = 4;
+        } else {                                       // WARLS=1, DRGB=2, DRGBW=3: bytes 2..N = first pixel
+          seqOff = 2;
+        }
+        uint32_t seq = ((uint32_t)udpIn[seqOff] << 16) | ((uint32_t)udpIn[seqOff+1] << 8) | (uint32_t)udpIn[seqOff+2];
+        uint32_t renderUs = micros() - recvUs;
+        uint8_t out[12];
+        memcpy(out, "WHKP", 4);
+        memcpy(out + 4, &seq, 4);
+        memcpy(out + 8, &renderUs, 4);
+        probeUdp.beginPacket(notifierUdp.remoteIP(), probePort);
+        probeUdp.write(out, 12);
+        probeUdp.endPacket();
+#endif
         return;
       }
 #endif
