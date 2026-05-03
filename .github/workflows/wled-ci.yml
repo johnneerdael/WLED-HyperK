@@ -9,3 +9,52 @@ on:
 jobs:
   wled_build:
     uses: ./.github/workflows/build.yml
+
+  publish_hyperk_release:
+    name: Publish HyperK Turbo rolling release
+    needs: wled_build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all firmware artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Collect bins
+        id: collect
+        run: |
+          mkdir -p release_assets
+          find artifacts -name '*.bin' -exec cp {} release_assets/ \;
+          echo "Files staged for release:"
+          ls -la release_assets/
+          # Compute a short SHA + ISO date for the release notes
+          echo "short_sha=$(echo ${GITHUB_SHA} | cut -c1-7)" >> $GITHUB_OUTPUT
+          echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+      - name: Update or create rolling 'latest' release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "HyperK Turbo (rolling main)"
+          body: |
+            Auto-built from `main` at commit `${{ steps.collect.outputs.short_sha }}` (${{ github.sha }}) on ${{ steps.collect.outputs.build_date }}.
+
+            **Flashing**
+
+            - **OTA from stock WLED:** download the matching `.bin` and upload it at `http://<device-ip>/update`. The release name matches stock WLED's, so no `skipValidation` is needed.
+            - **Serial flash:** see the README for `esptool.py` offsets, or run `pio run -e hyperk_turbo_esp32 -t upload --upload-port /dev/cu.usbserial-XXXX` locally.
+
+            **Available builds**
+
+            | Target | File |
+            | --- | --- |
+            | ESP32 (Xtensa) | `WLED_*_ESP32.bin` |
+            | ESP32-C3 (RISC-V) | `WLED_*_ESP32-C3.bin` |
+
+            See [docs/superpowers/plans/2026-05-03-wled-hyperk-turbo.md](https://github.com/${{ github.repository }}/blob/main/docs/superpowers/plans/2026-05-03-wled-hyperk-turbo.md) for the design and turbo-mode details.
+          files: release_assets/*.bin
+          make_latest: true
+          prerelease: false
+          fail_on_unmatched_files: true
