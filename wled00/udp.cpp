@@ -6,6 +6,13 @@ static WiFiUDP probeUdp;
 static uint16_t probePort = 21325;
 #endif
 
+#ifdef WLED_HYPERK_TURBO
+// Cache of main-segment start, refreshed once per realtime packet by
+// parseNotifyPacket's realtime branch entry. setRealtimePixel reads this
+// instead of calling strip.getMainSegment().start per pixel.
+static uint16_t s_hyperkTurboMainSegStart = 0;
+#endif
+
 /*
  * UDP sync notifier / Realtime / Hyperion / TPM2.NET
  */
@@ -606,6 +613,11 @@ void handleNotifications()
 
     //UDP realtime: 1 warls 2 drgb 3 drgbw 4 dnrgb 5 dnrgbw
     if (udpIn[0] > 0 && udpIn[0] < 6) {
+#ifdef WLED_HYPERK_TURBO
+      if (hyperkTurboMode) {
+        s_hyperkTurboMainSegStart = strip.getMainSegment().start;
+      }
+#endif
       realtimeIP = (isSupp) ? notifier2Udp.remoteIP() : notifierUdp.remoteIP();
       DEBUG_PRINTLN(realtimeIP);
       if (packetSize < 2) return;
@@ -713,9 +725,10 @@ void setRealtimePixel(uint16_t i, byte r, byte g, byte b, byte w)
   unsigned pix = i + arlsOffset;
 #ifdef WLED_HYPERK_TURBO
   if (hyperkTurboMode) {
-    // useMainSegmentOnly is forced true in beginStrip(); match its segment-relative
-    // semantics by translating to absolute bus index using the main segment's start.
-    BusManager::setPixelColor(strip.getMainSegment().start + pix, RGBW32(r, g, b, w));
+    // s_hyperkTurboMainSegStart is refreshed once per packet at the top of
+    // parseNotifyPacket's realtime branch; reading the cache avoids the
+    // per-pixel cost of strip.getMainSegment() inside this hot loop.
+    BusManager::setPixelColor(s_hyperkTurboMainSegStart + pix, RGBW32(r, g, b, w));
     return;
   }
 #endif
