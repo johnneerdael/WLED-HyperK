@@ -839,9 +839,13 @@ void WLED::initConnection()
 static void hyperkRtTask(void * /*arg*/) {
   for (;;) {
     if (hyperkTurboMode) {
-      hyperkPumpRealtimeUDP();
+      // If work was processed, immediately retry — bursts (e.g., DNRGB multi-packet
+      // frames) get drained without sleeping between packets. If idle, sleep 1 tick
+      // so IDLE can run and feed the watchdog.
+      if (!hyperkPumpRealtimeUDP()) vTaskDelay(1);
+    } else {
+      vTaskDelay(pdMS_TO_TICKS(50));
     }
-    vTaskDelay(1); // 1 tick — yields without busy-wait. Tick granularity is configTICK_RATE_HZ-dependent (default 10 ms on ESP32). G4 hardware bench will reveal whether this is the limiting latency factor; if so, revisit polling strategy.
   }
 }
 

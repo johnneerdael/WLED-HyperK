@@ -478,8 +478,9 @@ static void sendTPM2Ack() {
 }
 
 
-void handleNotifications()
+bool handleNotifications()
 {
+  bool worked = false;
   IPAddress localIP;
 
   //send second notification if enabled
@@ -498,7 +499,7 @@ void handleNotifications()
   if (realtimeMode && millis() > realtimeTimeout) exitRealtime();
 
   //receive UDP notifications
-  if (!udpConnected) return;
+  if (!udpConnected) return false;
 
   bool isSupp = false;
   size_t packetSize = notifierUdp.parsePacket();
@@ -506,33 +507,36 @@ void handleNotifications()
     packetSize = notifier2Udp.parsePacket();
     isSupp = true;
   }
+  // A packet was waiting — counts as work regardless of whether it validates
+  if (packetSize) worked = true;
 
   //hyperion / raw RGB
   if (!packetSize && udpRgbConnected) {
     packetSize = rgbUdp.parsePacket();
     if (packetSize) {
-      if (!receiveDirect) return;
-      if (packetSize > UDP_IN_MAXSIZE || packetSize < 3) return;
+      worked = true;
+      if (!receiveDirect) return false;
+      if (packetSize > UDP_IN_MAXSIZE || packetSize < 3) return false;
       realtimeIP = rgbUdp.remoteIP();
       DEBUG_PRINTLN(rgbUdp.remoteIP());
       uint8_t lbuf[packetSize];
       rgbUdp.read(lbuf, packetSize);
       realtimeLock(realtimeTimeoutMs, REALTIME_MODE_HYPERION);
-      if (realtimeOverride) return;
+      if (realtimeOverride) return false;
       unsigned totalLen = strip.getLengthTotal();
       for (size_t i = 0, id = 0; i < packetSize -2 && id < totalLen; i += 3, id++) {
         setRealtimePixel(id, lbuf[i], lbuf[i+1], lbuf[i+2], 0);
       }
       if (useMainSegmentOnly) strip.trigger();
       else                    strip.show();
-      return;
+      return true;
     }
   }
 
   localIP = Network.localIP();
   //notifier and UDP realtime
-  if (!packetSize || packetSize > UDP_IN_MAXSIZE) return;
-  if (!isSupp && notifierUdp.remoteIP() == localIP) return; //don't process broadcasts we send ourselves
+  if (!packetSize || packetSize > UDP_IN_MAXSIZE) return false;
+  if (!isSupp && notifierUdp.remoteIP() == localIP) return false; //don't process broadcasts we send ourselves
 
   uint8_t udpIn[packetSize +1];
   unsigned len;
@@ -541,7 +545,7 @@ void handleNotifications()
 
   // WLED nodes info notifications
   if (isSupp && udpIn[0] == 255 && udpIn[1] == 1 && len >= 40) {
-    if (!nodeListEnabled || notifier2Udp.remoteIP() == localIP) return;
+    if (!nodeListEnabled || notifier2Udp.remoteIP() == localIP) return worked;
 
     unsigned unit = udpIn[39];
     NodesMap::iterator it = Nodes.find(unit);
@@ -567,7 +571,7 @@ void handleNotifications()
           build |= udpIn[40+i]<<(8*i);
       it->second.build = build;
     }
-    return;
+    return worked;
   }
 
   //wled notifier, ignore if realtime packets active
@@ -575,7 +579,7 @@ void handleNotifications()
   {
     DEBUG_PRINTF_P(PSTR("UDP notification from: %d.%d.%d.%d\n"), notifierUdp.remoteIP()[0], notifierUdp.remoteIP()[1], notifierUdp.remoteIP()[2], notifierUdp.remoteIP()[3]);
     parseNotifyPacket(udpIn);
-    return;
+    return true;
   }
 
   if (receiveDirect) {
@@ -585,13 +589,13 @@ void handleNotifications()
       //if the number of LEDs in your installation doesn't allow that, please include padding bytes at the end of the last packet
       byte tpmType = udpIn[1];
       if (tpmType == 0xaa) { //TPM2.NET polling, expect answer
-        sendTPM2Ack(); return;
+        sendTPM2Ack(); return true;
       }
-      if (tpmType != 0xda) return; //return if notTPM2.NET data
+      if (tpmType != 0xda) return worked; //return if notTPM2.NET data
 
       realtimeIP = (isSupp) ? notifier2Udp.remoteIP() : notifierUdp.remoteIP();
       realtimeLock(realtimeTimeoutMs, REALTIME_MODE_TPM2NET);
-      if (realtimeOverride) return;
+      if (realtimeOverride) return worked;
 
       tpmPacketCount++; //increment the packet count
       if (tpmPacketCount == 1) tpmPayloadFrameSize = (udpIn[2] << 8) + udpIn[3]; //save frame size for the whole payload if this is the first packet
@@ -608,7 +612,7 @@ void handleNotifications()
         if (useMainSegmentOnly) strip.trigger();
         else                    strip.show();
       }
-      return;
+      return true;
     }
 
     //UDP realtime: 1 warls 2 drgb 3 drgbw 4 dnrgb 5 dnrgbw
@@ -620,15 +624,15 @@ void handleNotifications()
 #endif
       realtimeIP = (isSupp) ? notifier2Udp.remoteIP() : notifierUdp.remoteIP();
       DEBUG_PRINTLN(realtimeIP);
-      if (packetSize < 2) return;
+      if (packetSize < 2) return worked;
 
       if (udpIn[1] == 0) {
         realtimeTimeout = 0; // cancel realtime mode immediately
-        return;
+        return true;
       } else {
         realtimeLock(udpIn[1]*1000 +1, REALTIME_MODE_UDP);
       }
-      if (realtimeOverride) return;
+      if (realtimeOverride) return worked;
 
       unsigned totalLen = strip.getLengthTotal();
       if (udpIn[0] == 1 && packetSize > 5) { //warls
@@ -681,12 +685,12 @@ void handleNotifications()
         probeUdp.write(out, 12);
         probeUdp.endPacket();
 #endif
-        return;
+        return true;
       }
 #endif
       if (useMainSegmentOnly) strip.trigger();
       else                    strip.show();
-      return;
+      return true;
     }
   }
 
@@ -707,15 +711,16 @@ void handleNotifications()
   }
 
   UsermodManager::onUdpPacket(udpIn, packetSize);
+  return worked;
 }
 
 #if defined(WLED_HYPERK_TURBO) && defined(ARDUINO_ARCH_ESP32)
-void hyperkPumpRealtimeUDP() {
+bool hyperkPumpRealtimeUDP() {
   // Single-thread invariant: when hyperkTurboMode is true, ONLY this task calls
   // handleNotifications(). Main loop's call is gated in WLED::loop().
   // handleNotifications() does its own parsePacket() and returns immediately if
   // no packet is waiting; safe to call in a tight task loop.
-  handleNotifications();
+  return handleNotifications();
 }
 #endif
 
