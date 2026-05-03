@@ -666,6 +666,12 @@ void handleNotifications()
 void setRealtimePixel(uint16_t i, byte r, byte g, byte b, byte w)
 {
   unsigned pix = i + arlsOffset;
+#ifdef WLED_HYPERK_TURBO
+  if (hyperkTurboMode) {
+    BusManager::setPixelColor(pix, RGBW32(r, g, b, w));
+    return;
+  }
+#endif
   strip.setRealtimePixelColor(pix, RGBW32(r,g,b,w));
 }
 
