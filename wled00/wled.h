@@ -452,6 +452,11 @@ WLED_GLOBAL uint16_t realtimeTimeoutMs _INIT(2500);               // ms timeout 
 WLED_GLOBAL int arlsOffset _INIT(0);                              // realtime LED offset
 WLED_GLOBAL bool arlsDisableGammaCorrection _INIT(true);          // activate if gamma correction is handled by the source
 WLED_GLOBAL bool arlsForceMaxBri _INIT(false);                    // enable to force max brightness if source has very dark colors that would be black
+#ifdef WLED_HYPERK_TURBO
+WLED_GLOBAL bool hyperkTurboMode _INIT(true);                     // bypass FX pipeline in realtime UDP path
+#else
+WLED_GLOBAL bool hyperkTurboMode _INIT(false);
+#endif
 
 #ifdef WLED_ENABLE_DMX
  #if defined(ESP8266) || defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S2)
