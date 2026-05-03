@@ -668,7 +668,9 @@ void setRealtimePixel(uint16_t i, byte r, byte g, byte b, byte w)
   unsigned pix = i + arlsOffset;
 #ifdef WLED_HYPERK_TURBO
   if (hyperkTurboMode) {
-    BusManager::setPixelColor(pix, RGBW32(r, g, b, w));
+    // useMainSegmentOnly is forced true in beginStrip(); match its segment-relative
+    // semantics by translating to absolute bus index using the main segment's start.
+    BusManager::setPixelColor(strip.getMainSegment().start + pix, RGBW32(r, g, b, w));
     return;
   }
 #endif
