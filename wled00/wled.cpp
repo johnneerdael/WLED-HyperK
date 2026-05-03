@@ -127,6 +127,11 @@ void WLED::loop()
     handlePresets();
     yield();
 
+#ifdef WLED_HYPERK_TURBO
+    if (hyperkTurboMode && realtimeMode != REALTIME_MODE_INACTIVE) {
+      // turbo realtime: BusManager handles show directly from udp.cpp; skip FX service entirely
+    } else
+#endif
     if (!offMode || strip.isOffRefreshRequired() || strip.needsUpdate())
       strip.service();
     #ifdef ESP8266
