@@ -653,6 +653,7 @@ void WLED::beginStrip()
     receiveDirect = true;              // listen on UDP 21324
     if (realtimeTimeoutMs < 6500) realtimeTimeoutMs = 6500; // match HyperK 6.5s blackout
     BusManager::setMilliampsMax(0);    // disable ABL globally; user can re-enable in /settings if desired
+    noWifiSleep = true;                // disable WiFi modem-sleep; HyperHDR streaming demands sub-ms wake
   }
 #endif
 }
