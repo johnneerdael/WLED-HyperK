@@ -3,7 +3,6 @@
 #ifdef BENCH_PROBE
 #include <WiFiUdp.h>
 static WiFiUDP probeUdp;
-static IPAddress probeHost;
 static uint16_t probePort = 21325;
 #endif
 
