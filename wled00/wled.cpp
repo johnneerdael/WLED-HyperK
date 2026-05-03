@@ -66,7 +66,10 @@ void WLED::loop()
   handleSerial();
   #endif
   handleImprovWifiScan();
-  handleNotifications();
+#ifdef WLED_HYPERK_TURBO
+  if (!hyperkTurboMode)
+#endif
+    handleNotifications();
   handleTransitions();
   #ifdef WLED_ENABLE_DMX
   handleDMXOutput();
@@ -831,6 +834,27 @@ void WLED::initConnection()
 #endif
 }
 
+#if defined(WLED_HYPERK_TURBO) && defined(ARDUINO_ARCH_ESP32)
+static void hyperkRtTask(void * /*arg*/) {
+  for (;;) {
+    if (hyperkTurboMode) {
+      hyperkPumpRealtimeUDP();
+    }
+    vTaskDelay(1); // 1 tick (~1 ms) — yields without busy-wait
+  }
+}
+
+static void startHyperkRtTask() {
+  static TaskHandle_t handle = nullptr;
+  if (handle) return;
+  // Stack 4096 bytes — handleNotifications and its callees use udpIn[] buffer
+  // (~WLEDPACKETSIZE bytes) plus modest local scratch. Priority 5 keeps it above
+  // typical Arduino loop (1) without preempting Wi-Fi (high priorities).
+  // Pinned to core 1 (where Arduino loop runs); the WiFi stack runs on core 0.
+  xTaskCreatePinnedToCore(hyperkRtTask, "hyperkRt", 4096, nullptr, 5, &handle, 1);
+}
+#endif
+
 void WLED::initInterfaces()
 {
   DEBUG_PRINTLN(F("Init STA interfaces"));
@@ -881,6 +905,9 @@ void WLED::initInterfaces()
   e131.begin(e131Multicast, e131Port, e131Universe, E131_MAX_UNIVERSE_COUNT);
   ddp.begin(false, DDP_DEFAULT_PORT);
   reconnectHue();
+#if defined(WLED_HYPERK_TURBO) && defined(ARDUINO_ARCH_ESP32)
+  startHyperkRtTask();
+#endif
   interfacesInited = true;
   wasConnected = true;
 }

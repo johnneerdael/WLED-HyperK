@@ -697,6 +697,16 @@ void handleNotifications()
   UsermodManager::onUdpPacket(udpIn, packetSize);
 }
 
+#if defined(WLED_HYPERK_TURBO) && defined(ARDUINO_ARCH_ESP32)
+void hyperkPumpRealtimeUDP() {
+  // Single-thread invariant: when hyperkTurboMode is true, ONLY this task calls
+  // handleNotifications(). Main loop's call is gated in WLED::loop().
+  // handleNotifications() does its own parsePacket() and returns immediately if
+  // no packet is waiting; safe to call in a tight task loop.
+  handleNotifications();
+}
+#endif
+
 
 void setRealtimePixel(uint16_t i, byte r, byte g, byte b, byte w)
 {
