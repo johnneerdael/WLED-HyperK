@@ -637,6 +637,12 @@ void handleNotifications()
           setRealtimePixel(id, udpIn[i], udpIn[i+1], udpIn[i+2], udpIn[i+3]);
         }
       }
+#ifdef WLED_HYPERK_TURBO
+      if (hyperkTurboMode) {
+        BusManager::showNoABL();
+        return;
+      }
+#endif
       if (useMainSegmentOnly) strip.trigger();
       else                    strip.show();
       return;
