@@ -1351,6 +1351,12 @@ void BusManager::show() {
   }
 }
 
+void BusManager::showNoABL() {
+  for (auto &bus : busses) {
+    bus->show();
+  }
+}
+
 void IRAM_ATTR BusManager::setPixelColor(unsigned pix, uint32_t c) {
   for (auto &bus : busses) {
     if (!bus->containsPixel(pix)) continue;

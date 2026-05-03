@@ -562,6 +562,7 @@ namespace BusManager {
   [[gnu::hot]] void     setPixelColor(unsigned pix, uint32_t c);
   [[gnu::hot]] uint32_t getPixelColor(unsigned pix);
   void        show();
+  void        showNoABL();  // skips applyABL(), used by HyperK turbo realtime path
   bool        canAllShow();
   inline void setStatusPixel(uint32_t c) { for (auto &bus : busses) bus->setStatusPixel(c);}
   inline void setBrightness(uint8_t b)   { for (auto &bus : busses) bus->setBrightness(b); }
